@@ -1,0 +1,9 @@
+{
+  "name": "CoderBot",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "setup": "bash ./scripts/setup-codespace.sh",
+    "dev": "bash ./scripts/run-dev.sh"
+  }
+}

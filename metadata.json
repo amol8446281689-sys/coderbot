@@ -1,0 +1,8 @@
+{
+  "name": "CoderBot",
+  "description": "Personal AI coding assistant with code execution sandbox and vector memory.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ],
+  "permissions": []
+}

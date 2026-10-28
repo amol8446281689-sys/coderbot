@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --bg: #0f172a;
   --panel: #111827;
@@ -13,6 +15,7 @@ html, body, #root {
   min-height: 100%;
   background: var(--bg);
   color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
 }
 
 body {
@@ -24,6 +27,15 @@ body {
   min-height: 100vh;
   gap: 16px;
   padding: 16px;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100% !important;
+  }
 }
 
 .sidebar {
@@ -52,6 +64,8 @@ label {
   display: block;
   margin-bottom: 10px;
   font-weight: 600;
+  font-size: 0.95rem;
+  color: #cbd5e1;
 }
 
 textarea, button, pre {
@@ -66,6 +80,14 @@ textarea {
   border: 1px solid var(--border);
   background: var(--muted);
   color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13.5px;
+  line-height: 1.5;
+  outline: none;
+}
+
+textarea:focus {
+  border-color: var(--accent);
 }
 
 button {
@@ -77,6 +99,17 @@ button {
   color: white;
   font-weight: 700;
   cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+}
+
+button:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 pre {
@@ -87,9 +120,13 @@ pre {
   padding: 12px;
   min-height: 120px;
   overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 h1 {
   margin: 0;
   font-size: 2rem;
+  letter-spacing: -0.02em;
 }

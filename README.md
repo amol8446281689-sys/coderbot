@@ -1,103 +1,50 @@
 # CoderBot
 
-CoderBot is a full-stack personal coding assistant that lets you:
+CoderBot is an interactive AI coding assistant built with React 19, Vite, TypeScript, Tailwind CSS, and Express.
 
-- chat with an AI coding agent in a browser
-- store memories and retrieve them semantically
-- execute code in a safe sandbox for testing and debugging
-- connect to multiple open-source services for LLM, embeddings, and vector memory
-- keep a local workspace and project history
+## Features
 
-This repository is intentionally built with free and open-source platforms:
+- **Interactive AI Coding Assistant**: Chat with an intelligent coding assistant capable of generating, explaining, and debugging code.
+- **Sandboxed Code Execution**: Run JavaScript (Node.js) and Python 3 code in real time with captured stdout and stderr.
+- **One-Click Code Import**: Extract code snippets from AI responses directly into the sandbox editor.
+- **Vector Memory & Context Retrieval**: Remembers preferences and conversation context using semantic vector similarity search.
+- **Resilient Multi-Provider Backend**: Supports server-side Gemini API with fallback to TGI/Weaviate or built-in vector search.
+- **Real-Time WebSocket Support**: Real-time message acknowledgements over `/ws`.
 
-- Node.js + Express for the API backend
-- React + Vite for the browser UI
-- PostgreSQL for structured data
-- Redis for session/cache state
-- Weaviate for vector memory
-- Hugging Face Text Generation Inference (TGI) for open-source LLM inference
-- sentence-transformers for embedding generation
-- Docker Compose for local orchestration
+## Project Structure
 
-## Architecture
-
-- API server: `server/`
-- Browser UI: `frontend/`
-- Embedding microservice: `embeddings/`
-- Local orchestration: root `docker-compose.yml`
-
-## Quick start
-
-1. Clone the repo
-2. Start support services:
-
-```bash
-docker compose up --build -d
+```
+├── server.ts         # Full-stack Express server with Vite middleware & APIs
+├── src/
+│   ├── App.tsx       # Main React app shell with Chat, Sandbox, and Memory
+│   ├── main.tsx      # React entry point
+│   └── index.css     # Tailwind CSS styles and theme variables
+├── index.html        # HTML entry point
+├── vite.config.ts    # Vite bundler configuration
+└── package.json      # Dependencies and execution scripts
 ```
 
-3. Install backend dependencies:
+## Running the App
 
 ```bash
-cd server
-npm install
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Start production server
+npm start
 ```
 
-4. Install frontend dependencies:
+## API Endpoints
 
-```bash
-cd frontend
-npm install
-```
-
-5. Start backend and frontend:
-
-```bash
-cd server && npm run dev
-cd frontend && npm run dev -- --host 0.0.0.0
-```
-
-6. Open the frontend in the browser.
-
-## API endpoints
-
-### Chat
-
-```bash
-curl -X POST http://localhost:4000/api/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"message":"Create a Python script that prints Hello World","userId":"demo-user"}'
-```
-
-### Save memory
-
-```bash
-curl -X POST http://localhost:4000/api/memory/save \
-  -H 'Content-Type: application/json' \
-  -d '{"userId":"demo-user","key":"project-state","value":"Working on CoderBot"}'
-```
-
-### Run code
-
-```bash
-curl -X POST http://localhost:4000/api/run/run \
-  -H 'Content-Type: application/json' \
-  -d '{"language":"javascript","code":"console.log(\"hello from sandbox\")"}'
-```
-
-## Environment variables
-
-See `server/.env.example` for configuration values.
-
-## Security note
-
-This starter is designed for local development and learning. For real-world deployment, add:
-
-- JWT auth / user auth
-- per-user quotas and rate limits
-- hardened sandboxing using gVisor or Firecracker
-- secret management for LLM and database credentials
-- isolated network rules for sandbox jobs
-- audit logging for all user actions
+- `POST /api/chat`: Chat with the coding assistant with vector memory context.
+- `POST /api/run/run`: Run code snippets in a safe Node.js or Python 3 sandbox.
+- `POST /api/memory/save`: Store key-value notes and preferences into vector memory.
+- `POST /api/memory/search`: Semantic search through stored memories.
+- `GET /health` & `GET /api/health`: Health status.
+- `ws://0.0.0.0:3000/ws`: Real-time WebSocket connection.
 
 ## License
 

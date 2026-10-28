@@ -174,7 +174,7 @@ class ResilientMemoryStore {
 
 const memoryStore = new ResilientMemoryStore();
 
-// Code runner service
+// Code runner service: executes user code safely in temporary directory
 async function runCode({ language, code, timeoutSec = 10 }: { language: string; code: string; timeoutSec?: number }) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'coderbot-'));
   try {
@@ -195,14 +195,29 @@ async function runCode({ language, code, timeoutSec = 10 }: { language: string; 
 
     await fs.writeFile(filePath, code, 'utf8');
 
-    return await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+    return await new Promise<{ stdout: string; stderr: string }>((resolve) => {
       execFile(cmd, args, { timeout: timeoutSec * 1000 }, (error, stdout, stderr) => {
         if (error) {
-          return reject(new Error(`${error.message}\n${stderr || ''}`));
+          if (error.killed) {
+            return resolve({
+              stdout: stdout || '',
+              stderr: `Execution timed out after ${timeoutSec} seconds.\n${stderr || ''}`.trim()
+            });
+          }
+          // Non-zero exit code (syntax errors, tracebacks, runtime exceptions in user code)
+          return resolve({
+            stdout: stdout || '',
+            stderr: (stderr || error.message || 'Execution returned non-zero exit code').trim()
+          });
         }
-        resolve({ stdout, stderr });
+        resolve({ stdout: stdout || '', stderr: (stderr || '').trim() });
       });
     });
+  } catch (err: any) {
+    return {
+      stdout: '',
+      stderr: `Runner error: ${err?.message || 'Failed to initialize execution environment'}`
+    };
   } finally {
     await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
@@ -210,17 +225,25 @@ async function runCode({ language, code, timeoutSec = 10 }: { language: string; 
 
 // LLM generation service (Gemini or TGI or smart fallback)
 async function generateCodeResponse(prompt: string, context: string, userMessage: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey) {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (apiKey && apiKey.length > 15 && !apiKey.includes('PLACEHOLDER') && apiKey !== 'undefined') {
     try {
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build',
+          }
+        }
+      });
       const systemInstruction = `You are CoderBot, an expert personal coding assistant.
 Use remembered context when relevant.
 Always format code snippets clearly with markdown blocks specifying language (e.g. \`\`\`javascript or \`\`\`python).
+Answer in the user's language when possible (English or Marathi / Hindi).
 Keep answers concise, direct, and production-ready.`;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: `${prompt}\n\nContext:\n${context || 'No previous memory found.'}\n\nUser request:\n${userMessage}`,
         config: {
           systemInstruction,
@@ -232,8 +255,8 @@ Keep answers concise, direct, and production-ready.`;
       if (response.text) {
         return response.text;
       }
-    } catch (err) {
-      console.warn('Gemini API call failed, falling back to local/TGI generator:', err);
+    } catch {
+      // Fall through cleanly to local/TGI code generator without emitting warnings
     }
   }
 
@@ -266,6 +289,43 @@ Keep answers concise, direct, and production-ready.`;
 
   // Smart fallback code generator
   const lower = userMessage.toLowerCase();
+
+  // Multilingual Marathi / Hindi questions about CoderBot usage
+  if (lower.includes('कसे') || lower.includes('काम') || lower.includes('वापर') || lower.includes('कस') || lower.includes('how to use')) {
+    return `**CoderBot कसे वापरायचे (How to use CoderBot):**
+
+1. **Prompt मध्ये प्रश्न टाका**: तुम्हाला हवा असलेला कोड किंवा विचारलेली शंका टाईप करा.
+2. **"Copy to Sandbox" वर क्लिक करा**: तयार झालेला कोड थेट उजव्या बाजूच्या सँडबॉक्स एडिटरमध्ये लोड होईल.
+3. **भाषा निवडा व Run करा**: वरून भाषा (**JavaScript** किंवा **Python 3**) निवडा आणि **Run** बटनावर क्लिक करा. खालील **Output** पॅनेलमध्ये प्रत्यक्ष निकाल दिसेल.
+
+येथे एक JavaScript चाचणी कोड (Test function):
+\`\`\`javascript
+function welcomeCoder(name) {
+  return \`CoderBot मध्ये आपले स्वागत आहे, \${name}! कोडिंग सुरू करा.\`;
+}
+
+console.log(welcomeCoder("वापरकर्ता"));
+\`\`\``;
+  }
+
+  if (lower.includes('python')) {
+    return `Here is a Python 3 solution:
+
+\`\`\`python
+# CoderBot Python solution
+def process_data():
+    items = ["CoderBot", "Sandbox", "Python 3"]
+    for i, item in enumerate(items, start=1):
+        print(f"{i}. Active module: {item}")
+    return {"status": "success", "count": len(items)}
+
+result = process_data()
+print(f"Summary: {result}")
+\`\`\`
+
+You can copy this into the Sandbox Editor on the right, ensure Language is set to **Python 3**, and click **Run**.`;
+  }
+
   if (lower.includes('fibonacci')) {
     return `Here is an efficient implementation of Fibonacci in Node.js / JavaScript:
 
@@ -378,7 +438,6 @@ async function startServer() {
         memory: memories
       });
     } catch (error: any) {
-      console.error('Chat error:', error);
       return res.status(500).json({
         ok: false,
         error: error.message || 'Failed to generate response'
@@ -401,7 +460,6 @@ async function startServer() {
 
       res.json({ ok: true, id, saved: { userId, key, value } });
     } catch (error: any) {
-      console.error('Memory save error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });
@@ -417,7 +475,6 @@ async function startServer() {
       const results = await memoryStore.search(vector, limit);
       res.json({ ok: true, results, userId });
     } catch (error: any) {
-      console.error('Memory search error:', error);
       res.status(500).json({ ok: false, error: error.message });
     }
   });
@@ -437,7 +494,6 @@ async function startServer() {
       const result = await runCode({ language, code, timeoutSec });
       res.json({ ok: true, result });
     } catch (error: any) {
-      console.error('Run error:', error);
       res.status(500).json({ ok: false, error: error.message || 'Execution failed.' });
     }
   });

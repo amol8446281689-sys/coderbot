@@ -66,24 +66,27 @@ export default function App() {
   }
 
   // Extract code from AI response to insert into Sandbox
-  function extractCode(text: string): string | null {
-    const match = text.match(/```(?:javascript|js|python|py)?\n([\s\S]*?)```/);
-    if (match && match[1]) {
-      return match[1].trim();
+  function extractCode(text: string): { code: string; lang: 'javascript' | 'python' } | null {
+    const pyMatch = text.match(/```(?:python|py)\n([\s\S]*?)```/i);
+    if (pyMatch && pyMatch[1]) {
+      return { code: pyMatch[1].trim(), lang: 'python' };
+    }
+    const jsMatch = text.match(/```(?:javascript|js|node|typescript|ts)?\n([\s\S]*?)```/i);
+    if (jsMatch && jsMatch[1]) {
+      const extracted = jsMatch[1].trim();
+      const isPython = extracted.includes('def ') || (extracted.includes('print(') && !extracted.includes('console.log'));
+      return { code: extracted, lang: isPython ? 'python' : 'javascript' };
     }
     return null;
   }
 
-  const detectedCode = extractCode(result);
+  const detected = extractCode(result);
+  const detectedCode = detected?.code || null;
 
   function copyCodeToEditor() {
-    if (detectedCode) {
-      setCode(detectedCode);
-      if (result.includes('```python') || result.includes('def ')) {
-        setLanguage('python');
-      } else {
-        setLanguage('javascript');
-      }
+    if (detected) {
+      setCode(detected.code);
+      setLanguage(detected.lang);
     }
   }
 
@@ -123,8 +126,24 @@ export default function App() {
       });
       const json = await response.json();
       if (json.ok) {
-        const out = json.result.stdout || json.result.stderr || 'No output produced.';
-        setRunOutput(out);
+        const stdout = (json.result?.stdout || '').trim();
+        const stderr = (json.result?.stderr || '').trim();
+
+        let display = '';
+        if (stdout && stderr) {
+          display = `${stdout}\n\n[Diagnostics / Error Output]:\n${stderr}`;
+        } else if (stderr) {
+          display = stderr;
+        } else {
+          display = stdout || 'Execution finished with exit code 0 (no output produced).';
+        }
+
+        // Add helpful hint if JavaScript code was run in Python mode
+        if (language === 'python' && code.includes('console.log') && stderr.includes('SyntaxError')) {
+          display += '\n\n💡 Hint: The code contains "console.log" (JavaScript syntax). Switch the Language dropdown above to "JavaScript (Node.js)" or use "print()" for Python.';
+        }
+
+        setRunOutput(display);
       } else {
         setRunOutput('Error: ' + (json.error || 'Execution failed'));
       }
